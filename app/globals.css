@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+/*
+ * Confide — design tokens. Mirrors Design.md §3/§4. If you change a value here,
+ * change it there too; the doc is the spec, this is the implementation.
+ */
+@theme {
+  /* Field — blue-cast near-black, like iron-gall ink. Never neutral grey. */
+  --color-ink: #070a0f;
+  --color-ink-raised: #0f141c;
+  --color-ink-inset: #161d27;
+  --color-rule: #1e2733;
+  --color-rule-strong: #2e3a49;
+
+  --color-vellum: #e8e3d9;
+  --color-vellum-dim: #94a0b0;
+  --color-vellum-faint: #5e6979;
+
+  /* The three visibility states. Design.md §1 — these colours mean one thing
+   * each and nothing else may use them. */
+  --color-graphite: #7c8899; /* PUBLIC    — anyone can read */
+  --color-wax: #d4863c; /* SEALED    — encrypted */
+  --color-wax-deep: #8a5220;
+  --color-wax-bg: #241708;
+  --color-verdigris: #3fa66a; /* DISCLOSED — decrypted for you */
+  --color-verdigris-bg: #0e2117;
+  --color-cinnabar: #c4483f; /* errors, and only errors */
+
+  --radius-card: 12px;
+  --radius-input: 8px;
+  --radius-pill: 999px;
+
+  --font-display: var(--font-martian), ui-monospace, monospace;
+  --font-body: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-data: var(--font-jetbrains), ui-monospace, "SF Mono", monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-ink);
+    color: var(--color-vellum);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Every numeric readout is tabular so the reveal lands digits in the same
+   * place before and after decryption. Design.md §4. */
+  code,
+  kbd,
+  samp,
+  .font-data {
+    font-family: var(--font-data);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Quality floor, not a feature: focus must always be visible. */
+  :focus-visible {
+    outline: 2px solid var(--color-wax);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: var(--color-wax);
+    color: var(--color-ink);
+  }
+}
+
+/*
+ * THE RULED LEDGER — Design.md §8.
+ *
+ * Structural, not decorative: it encodes that this is a ledger, and it is what
+ * stops the near-black field reading as a flat void (which is the generic
+ * near-black-plus-one-accent look we are deliberately avoiding).
+ */
+.ledger-field {
+  background-color: var(--color-ink);
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--color-rule) 55%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-rule) 40%, transparent) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* Vignette so the grid falls away at the edges instead of tiling to infinity. */
+.ledger-field::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 90% 70% at 50% 30%,
+    transparent 0%,
+    color-mix(in srgb, var(--color-ink) 85%, transparent) 70%,
+    var(--color-ink) 100%
+  );
+}
+
+@utility text-hero {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+}
+
+@utility text-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+/* The scanline that passes over a seal while the TEE is working. Design.md §7.
+ * Honest by construction: it conveys "working", never a fake percentage. */
+@keyframes seal-scan {
+  0% {
+    transform: translateY(-120%);
+  }
+  100% {
+    transform: translateY(120%);
+  }
+}
+
+@keyframes rule-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

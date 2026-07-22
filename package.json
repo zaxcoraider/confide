@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Private payroll for public treasuries — a Safe module powered by iExec Nox",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "compile": "hardhat compile",
     "phase0": "tsx scripts/phase0.ts",
     "phase05": "tsx scripts/phase05.ts",
@@ -14,17 +17,30 @@
   },
   "dependencies": {
     "@iexec-nox/handle": "0.1.0-beta.13",
+    "@safe-global/protocol-kit": "^8.0.4",
     "@iexec-nox/nox-confidential-contracts": "^0.2.2",
     "@iexec-nox/nox-protocol-contracts": "^0.2.4",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "@tanstack/react-query": "^5.101.4",
     "encrypted-types": "^0.0.4",
-    "viem": "^2.48.4"
+    "motion": "^12.42.2",
+    "next": "^16.2.11",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "three": "^0.185.1",
+    "viem": "^2.48.4",
+    "wagmi": "^3.7.3"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-viem": "^3.0.6",
-    "@safe-global/protocol-kit": "^8.0.4",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^20",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "dotenv": "^17.4.2",
     "hardhat": "^3.4.2",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }
