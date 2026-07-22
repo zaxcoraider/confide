@@ -29,14 +29,23 @@
       ]
     }
   },
+  // The FRONTEND only. `hardhat.config.ts` and `scripts/**` are deliberately
+  // absent: `next build` typechecks everything listed here, and Hardhat is a
+  // devDependency that a deployment target has no reason to install. Including
+  // them made a Vercel build fail on `Cannot find module 'hardhat/config.js'`
+  // while `npm run build` passed locally, purely because the local machine
+  // happens to have Hardhat installed.
+  //
+  // Phase 5 requires a stranger to clone this repo and build the app without
+  // ever touching Hardhat — same reason lib/abis.ts hand-writes the ABIs
+  // instead of importing artifacts. Typecheck the scripts with
+  // `npx tsc -p tsconfig.scripts.json --noEmit`.
   "include": [
     "next-env.d.ts",
     "app/**/*.ts",
     "app/**/*.tsx",
     "components/**/*.tsx",
-    "scripts/**/*.ts",
     "lib/**/*.ts",
-    "hardhat.config.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],

@@ -1,0 +1,11 @@
+{
+  // The Hardhat / deploy-script half of the repo, kept out of `tsconfig.json`
+  // so that `next build` never needs Hardhat installed. Requires devDependencies.
+  //
+  //   npx tsc -p tsconfig.scripts.json --noEmit
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["hardhat.config.ts", "scripts/**/*.ts", "lib/**/*.ts"]
+}
