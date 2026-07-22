@@ -88,16 +88,22 @@ contract PayrollModule {
     mapping(uint256 batchId => Payout[]) private _payouts;
     mapping(uint256 batchId => bool) public executed;
 
+    /// @dev Public record of who was granted disclosure over which batch.
+    /// Disclosure being auditable is part of the point.
+    mapping(uint256 batchId => mapping(address auditor => bool)) public isAuditor;
+
     error OnlyAdmin(address caller);
     error OnlySafe(address caller);
     error BatchAlreadyExecuted(uint256 batchId);
     error BatchEmpty(uint256 batchId);
     error InvalidRecipient();
+    error InvalidAuditor();
     error SafeExecutionFailed(uint256 batchId, uint256 index);
 
     /// @dev Amounts are deliberately absent from every event — they are the secret.
     event PayoutStaged(uint256 indexed batchId, address indexed recipient, uint256 index);
     event BatchExecuted(uint256 indexed batchId, uint256 count);
+    event AuditorGranted(uint256 indexed batchId, address indexed auditor, uint256 count);
 
     modifier onlyAdmin() {
         if (msg.sender != admin) revert OnlyAdmin(msg.sender);
@@ -211,6 +217,47 @@ contract PayrollModule {
         }
 
         emit BatchExecuted(batchId, count);
+    }
+
+    // ── Disclose ──────────────────────────────────────────────────────────────
+
+    /**
+     * Grant `auditor` the right to decrypt every payout amount in `batchId`.
+     *
+     * This is the feature that makes Confide auditable rather than merely
+     * opaque. Confidentiality that cannot be selectively lifted is not a
+     * treasury product — it is a black hole. Disclosure is:
+     *
+     *   - authorised by the Safe (m-of-n), never by one admin;
+     *   - scoped to a single batch, not the whole ledger;
+     *   - additive only — there is no way to revoke ACL access in Nox today, so
+     *     treat every grant as permanent (see `AuditorGranted` for the record);
+     *   - invisible to everyone else. The public still sees only `bytes32`.
+     *
+     * Callable before or after execution: an auditor's job usually starts after
+     * the money has moved.
+     *
+     * NOTE the auditor reads the PAYOUT handles held by this module, not the
+     * recipients' balances. Balance handles are granted to recipients by the
+     * token itself and are not ours to give away — an auditor granted here
+     * learns what each person was PAID in this batch, not what they hold.
+     * That is the narrower and more defensible disclosure.
+     */
+    function grantAuditor(address auditor, uint256 batchId) external onlySafe {
+        if (auditor == address(0)) revert InvalidAuditor();
+
+        Payout[] storage payouts = _payouts[batchId];
+        uint256 count = payouts.length;
+        if (count == 0) revert BatchEmpty(batchId);
+
+        for (uint256 i = 0; i < count; i++) {
+            // The module holds persistent access from `Nox.allowThis` at staging,
+            // which is what permits it to delegate here (`allow` is onlyAllowed).
+            Nox.allow(payouts[i].amount, auditor);
+        }
+
+        isAuditor[batchId][auditor] = true;
+        emit AuditorGranted(batchId, auditor, count);
     }
 
     // ── Views ─────────────────────────────────────────────────────────────────
