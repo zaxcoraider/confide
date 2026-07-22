@@ -1,0 +1,27 @@
+{
+  "name": "confide",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Private payroll for public treasuries — a Safe module powered by iExec Nox",
+  "scripts": {
+    "compile": "hardhat compile",
+    "phase0": "tsx scripts/phase0.ts",
+    "phase05": "tsx scripts/phase05.ts"
+  },
+  "dependencies": {
+    "@iexec-nox/handle": "0.1.0-beta.13",
+    "@iexec-nox/nox-protocol-contracts": "^0.2.4",
+    "encrypted-types": "^0.0.4",
+    "viem": "^2.48.4"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-viem": "^3.0.6",
+    "@safe-global/protocol-kit": "^8.0.4",
+    "@types/node": "^20",
+    "dotenv": "^17.4.2",
+    "hardhat": "^3.4.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

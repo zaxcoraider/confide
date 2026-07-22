@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.env
+.env.local
+hardhat-artifacts/
+hardhat-cache/
+*.tsbuildinfo
+.DS_Store
+
+# Internal planning docs — not for the public repo
+PRD.md
+Architecture.md
+Rules.md
+Phases.md
+Design.md
+Memory.md
