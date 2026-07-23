@@ -223,6 +223,7 @@ function AuditBatch() {
                     index={i}
                     recipient={row?.[0]}
                     handle={row?.[1]}
+                    granted={granted}
                   />
                 );
               })}
@@ -253,10 +254,13 @@ function PayoutRow({
   index,
   recipient,
   handle,
+  granted,
 }: {
   index: number;
   recipient: `0x${string}` | undefined;
   handle: `0x${string}` | undefined;
+  /** From `isAuditor` on chain. Undefined until that read lands. */
+  granted: boolean | undefined;
 }) {
   const { run, phase, value, error } = useDecrypt();
 
@@ -283,18 +287,36 @@ function PayoutRow({
         ) : busy ? (
           <span className="text-wax text-[13px]">{PHASE_COPY[phase]}</span>
         ) : error ? (
-          // The real message, not a paraphrase. A denial and a TEE timeout read
-          // very differently here, and flattening both to "denied" would hide a
+          // The real message, never a paraphrase — a denial and a TEE timeout
+          // read very differently, and flattening both to "denied" would hide a
           // genuine failure behind an expected one. Rules.md §4.
-          <span
-            title={error}
-            className="text-cinnabar font-data line-clamp-3 text-[12px] leading-5 break-words"
-          >
-            {error}
-          </span>
+          //
+          // But when `isAuditor` already read false, the outcome is not in
+          // doubt, and the retry helper's wording ("still not ready", "if this
+          // persists") describes a timeout because it cannot tell the two
+          // apart. The page can. So state the refusal plainly and keep the
+          // gateway's own words underneath it, unedited.
+          <div title={error} className="min-w-0">
+            {granted === false && (
+              <span className="text-cinnabar mb-1 block text-[13px]">
+                Not permitted to read this payout.
+              </span>
+            )}
+            <span className="text-cinnabar font-data line-clamp-2 block text-[11px] leading-4 break-words opacity-70">
+              {error}
+            </span>
+          </div>
         ) : (
           <button
-            onClick={() => handle && run(handle)}
+            // When `isAuditor` already reads false, the denial is a FACT, not a
+            // hypothesis — cut the poll short rather than spending 90s
+            // pretending we might be watching a sync race. The attempt is still
+            // made, and still reports the gateway's own words, because a
+            // refusal you can see happen is the control that makes the grant in
+            // T15 mean anything. Rules.md §4 — never fake either outcome.
+            onClick={() =>
+              handle && run(handle, granted === false ? { timeoutMs: 12_000 } : undefined)
+            }
             disabled={!handle}
             className="border-rule-strong text-vellum hover:border-wax hover:text-wax rounded-input cursor-pointer border px-3 py-1.5 text-[13px] transition-colors duration-100 disabled:opacity-40"
           >

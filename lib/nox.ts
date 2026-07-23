@@ -102,9 +102,36 @@ const SKEW_THRESHOLD_MS = 2_000;
  */
 const SKEW_MARGIN_MS = 120_000;
 
+/**
+ * Backdates applied when skew cannot be MEASURED but a 401 proves it exists.
+ *
+ * A BROWSER CANNOT MEASURE THE SKEW. `Date` is not a CORS-safelisted response
+ * header, so on any cross-origin response `res.headers.get("date")` returns
+ * null and `measureClockSkewMs` reports 0 — and the pre-23-Jul logic only
+ * compensated when it could put a number on it. The result was that a browser
+ * never compensated at all: it retried the same doomed token ten times and gave
+ * up after 92s. That is exactly how the first in-browser decrypt failed, on a
+ * machine already known to be ~20s fast, while the identical call from Node
+ * succeeded.
+ *
+ * The 401 is itself the evidence. Compensate on it whether or not the size is
+ * knowable, and escalate rather than repeat, since retrying an identically
+ * skewed token is futile by construction.
+ *
+ * Over-shifting is nearly free: `expiresAt` is `notBefore + 1h`, so any backdate
+ * under roughly 50 minutes still produces a valid token. Hence values that
+ * comfortably cover a badly-set clock rather than ones that merely cover ours.
+ */
+const FALLBACK_SHIFTS_MS = [300_000, 900_000, 1_800_000];
+
 let skewProbe: Promise<number> | null = null;
 
-/** Positive result means the local clock is AHEAD of the gateway. Cached. */
+/**
+ * Positive result means the local clock is AHEAD of the gateway. Cached.
+ *
+ * Returns 0 in a browser — see FALLBACK_SHIFTS_MS above. A 0 here means
+ * "unknown", never "synchronised", and callers must not read it as the latter.
+ */
 export function measureClockSkewMs(gatewayUrl = GATEWAY_URL): Promise<number> {
   skewProbe ??= (async () => {
     try {
@@ -173,6 +200,8 @@ async function pollUntilReady(
   let attempt = 0;
   let lastError: unknown;
   let shiftMs = 0;
+  let measured = false;
+  let fallback = 0;
 
   while (elapsed() < timeoutMs) {
     attempt++;
@@ -183,12 +212,29 @@ async function pollUntilReady(
       lastError = error;
 
       // Clock skew: retrying unchanged is futile (every attempt mints a fresh
-      // token with the same bad notBefore), so measure the skew once and retry
-      // immediately with a compensated clock rather than sleeping.
-      if (isClockSkewError(error) && shiftMs === 0) {
-        const measured = await measureClockSkewMs();
-        if (measured > SKEW_THRESHOLD_MS) {
-          shiftMs = Math.round(measured) + SKEW_MARGIN_MS;
+      // token with the same bad notBefore), so change the clock and retry
+      // immediately rather than sleeping.
+      //
+      // Try to measure the skew once, because a measured value makes the logs
+      // diagnostic. But never make compensation CONDITIONAL on measuring: a
+      // browser cannot read the gateway's Date header at all, and treating that
+      // as "no skew" is what made every in-browser decrypt fail. Fall back to
+      // fixed backdates, escalating each time.
+      if (isClockSkewError(error)) {
+        let next: number | null = null;
+
+        if (!measured) {
+          measured = true;
+          const ms = await measureClockSkewMs();
+          if (ms > SKEW_THRESHOLD_MS) next = Math.round(ms) + SKEW_MARGIN_MS;
+        }
+        if (next === null && fallback < FALLBACK_SHIFTS_MS.length) {
+          next = FALLBACK_SHIFTS_MS[fallback++]!;
+        }
+
+        // Only worth another attempt if the clock actually moves further back.
+        if (next !== null && next > shiftMs) {
+          shiftMs = next;
           onWait?.(attempt, elapsed());
           continue;
         }
@@ -206,9 +252,10 @@ async function pollUntilReady(
   const seconds = Math.round(elapsed() / 1000);
   const detail = lastError instanceof Error ? lastError.message : String(lastError);
   const hint = /token is not active or expired/i.test(detail)
-    ? " This is a CLOCK SKEW failure: check that the system clock is accurate " +
-      "(a client running fast makes the auth token not-yet-valid; running more " +
-      "than an hour slow makes it genuinely expired)."
+    ? ` This is a CLOCK SKEW failure and compensation did not rescue it` +
+      `${shiftMs > 0 ? ` (backdated ${Math.round(shiftMs / 1000)}s, still rejected)` : " (no backdate was applied)"}. ` +
+      "Fix the system clock: a client running fast makes the auth token " +
+      "not-yet-valid, and running more than an hour slow makes it genuinely expired."
     : " If this persists the permission is genuinely missing, not lagging.";
   throw new Error(
     `${label} still not ready after ${seconds}s (${attempt} attempts).${hint} Last error: ${detail}`,

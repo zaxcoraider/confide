@@ -34,10 +34,15 @@ export function Reveal({
   sealSize?: number;
   actionLabel?: string;
 }) {
-  const { run, phase, value, error } = useDecrypt();
+  const { run, phase, value, valueHandle, error } = useDecrypt();
 
   const busy = phase === "authorising" || phase === "waiting" || phase === "slow";
-  const disclosed = phase === "done" && value !== null;
+  // The handle must match the one this value was decrypted FROM. A balance
+  // handle changes whenever the balance does — wrap more, get paid — and this
+  // component keeps its state across that change. Checking `phase === "done"`
+  // alone would show the new handle beside the old amount, which is the one
+  // lie this interaction cannot tell.
+  const disclosed = phase === "done" && value !== null && valueHandle === handle;
   const sealState: SealState = disclosed ? "disclosed" : busy ? "working" : "sealed";
 
   return (

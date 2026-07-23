@@ -218,10 +218,31 @@ function TheSplit({
  * exist first. Neither the two-step shape nor the fact that `wrap` returns a
  * handle the caller holds only transiently is obvious from the interface —
  * both are recorded as friction in the feedback notes.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * WHY THERE IS A DESTINATION CHOICE
+ *
+ * `wrap` is `wrap(address to, uint256 amount)` (fact 12), and the `to` is the
+ * whole difference between funding yourself and funding the treasury. Without
+ * the choice this screen could only ever mint to the connected account, and the
+ * Safe — which is what actually pays a batch — would have no route to being
+ * funded from the product at all.
+ *
+ * Wrapping straight to the Safe is also strictly better than the path
+ * `scripts/phase2.ts` takes (wrap to admin, then `confidentialTransfer` to the
+ * Safe): it is one transaction instead of two and needs no proof, because the
+ * token mints and calls `Nox.allow(newBalance, to)` itself.
+ *
+ * Getting this wrong is expensive and SILENT: a batch paid out of a Safe that
+ * holds too little does not revert, it clamps the transfer to zero (fact 15).
  */
 function WrapFlow({ onDone }: { onDone: () => void }) {
   const { address } = useAccount();
   const [amount, setAmount] = useState("");
+
+  // Defaults to the treasury: this is the Treasury screen, and funding the Safe
+  // is the act the rest of the product depends on.
+  const [destination, setDestination] = useState<"safe" | "self">("safe");
 
   const approveTx = useTx();
   const wrapTx = useTx();
@@ -277,11 +298,12 @@ function WrapFlow({ onDone }: { onDone: () => void }) {
 
   async function wrap() {
     if (!parsed || !address) return;
+    const to = destination === "safe" ? ADDRESSES.safe : address;
     const hash = await wrapTx.send({
       address: ADDRESSES.confidentialUsdc,
       abi: confidentialUsdcAbi,
       functionName: "wrap",
-      args: [address, parsed],
+      args: [to, parsed],
     });
     if (hash) {
       setAmount("");
@@ -298,7 +320,7 @@ function WrapFlow({ onDone }: { onDone: () => void }) {
 
       <Field
         label="Amount to wrap"
-        hint="Public USDC in, confidential cUSDC out. The wrapper's total supply rises publicly; your balance inside it does not."
+        hint="Public USDC in, confidential cUSDC out. The wrapper's total supply rises publicly; the balance inside it does not."
       >
         <Input
           value={amount}
@@ -307,6 +329,40 @@ function WrapFlow({ onDone }: { onDone: () => void }) {
           inputMode="decimal"
           disabled={busy}
         />
+      </Field>
+
+      <Field
+        label="Credit to"
+        hint={
+          destination === "safe"
+            ? "The Safe is what pays a batch, so this is how the treasury is funded. Once credited, nobody can read the balance — not even the Safe's owners."
+            : "Mints to your own account. You will be able to read this balance, because the token grants the holder access."
+        }
+      >
+        <div className="flex gap-2">
+          {(
+            [
+              ["safe", "The treasury", truncateAddress(ADDRESSES.safe)],
+              ["self", "Your account", address ? truncateAddress(address) : "—"],
+            ] as const
+          ).map(([value, label, sub]) => (
+            <button
+              key={value}
+              type="button"
+              disabled={busy}
+              onClick={() => setDestination(value)}
+              aria-pressed={destination === value}
+              className={`rounded-input flex-1 cursor-pointer border px-3 py-2 text-left transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-40 ${
+                destination === value
+                  ? "border-wax text-wax"
+                  : "border-rule text-vellum-faint hover:border-rule-strong"
+              }`}
+            >
+              <span className="block text-[13px]">{label}</span>
+              <span className="font-data block text-[12px] opacity-70">{sub}</span>
+            </button>
+          ))}
+        </div>
       </Field>
 
       {amount.trim() && parsed === null && (
@@ -349,7 +405,14 @@ function WrapFlow({ onDone }: { onDone: () => void }) {
       </div>
 
       <TxStatus {...approveTx} done="Allowance set." />
-      <TxStatus {...wrapTx} done="Wrapped. Your balance is now confidential." />
+      <TxStatus
+        {...wrapTx}
+        done={
+          destination === "safe"
+            ? "Wrapped into the treasury. The public total above rose by exactly this much; what the Safe holds stayed a handle."
+            : "Wrapped. Your balance is now confidential."
+        }
+      />
     </div>
   );
 }

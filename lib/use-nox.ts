@@ -15,7 +15,7 @@
  */
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useAccount, useWalletClient } from "wagmi";
-import { decryptWithRetry } from "./nox";
+import { decryptWithRetry, type RetryOptions } from "./nox";
 
 /** Progressive, honest status. Design.md §7 — never a bare spinner. */
 export type DecryptPhase = "idle" | "authorising" | "waiting" | "slow" | "done" | "error";
@@ -132,26 +132,55 @@ export function useDecrypt() {
   const { address } = useAccount();
   const [phase, setPhase] = useState<DecryptPhase>("idle");
   const [value, setValue] = useState<bigint | null>(null);
+  /**
+   * WHICH handle this value belongs to. Load-bearing, not bookkeeping.
+   *
+   * A balance handle changes whenever the balance does, so a component holding
+   * this state can be re-rendered with a NEW handle while still holding the OLD
+   * plaintext. Without this, the UI would show a fresh handle beside a stale
+   * amount — asserting a decryption that never happened for the handle on
+   * screen, which is precisely the claim this product cannot get wrong.
+   *
+   * Callers must compare it against the handle they are rendering rather than
+   * trusting `phase === "done"` alone.
+   */
+  const [valueHandle, setValueHandle] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reset = useCallback(() => {
     setPhase("idle");
     setValue(null);
+    setValueHandle(null);
     setError(null);
   }, []);
 
+  /**
+   * `options` exists for ONE case: a caller that already knows, from chain
+   * state, that this decrypt is expected to be denied.
+   *
+   * A denial and an RPC sync race are indistinguishable by message (fact 9b),
+   * so the default is to poll the full 90s rather than call a lagging read a
+   * refusal. But a screen that has already read `isAuditor` and got false is
+   * not guessing — it should not make the user watch a spinner for a minute and
+   * a half to be told what it could already prove. `scripts/phase2.ts` makes the
+   * same call with `timeoutMs: 12_000` for exactly this reason.
+   */
   const run = useCallback(
-    async (handle: string) => {
+    async (handle: string, options?: RetryOptions) => {
       setPhase("authorising");
       setError(null);
       setValue(null);
+      setValueHandle(null);
       try {
         const client = await getClient();
         const result = await decryptWithRetry(client as never, handle, {
+          ...options,
+          // Ours, never the caller's — the phase drives the UI.
           onWait: (_attempt, elapsedMs) =>
             setPhase(elapsedMs > 12_000 ? "slow" : "waiting"),
         });
         setValue(BigInt(result as bigint));
+        setValueHandle(handle);
         setPhase("done");
         return BigInt(result as bigint);
       } catch (e) {
@@ -164,7 +193,7 @@ export function useDecrypt() {
   );
 
   return useMemo(
-    () => ({ run, reset, phase, value, error, account: address }),
-    [run, reset, phase, value, error, address],
+    () => ({ run, reset, phase, value, valueHandle, error, account: address }),
+    [run, reset, phase, value, valueHandle, error, address],
   );
 }

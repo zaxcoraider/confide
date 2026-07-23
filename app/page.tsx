@@ -21,8 +21,18 @@ import { VisibilityBadge } from "@/components/visibility";
  */
 const Seal3D = dynamic(() => import("@/components/seal-3d"), { ssr: false });
 
-/** A real handle from batch 0 on Sepolia — not a decorative placeholder. */
-const HERO_HANDLE = "0x8f3a2b1c9d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c64e7d";
+/**
+ * A real handle, not a decorative placeholder — payout 0 of batch 0 on the live
+ * PayrollModule (`0xc508bd…a76b`), read off Sepolia on 23 Jul 2026. Rules.md §1.7:
+ * no mock data anywhere on the demo path, and this is its first frame.
+ *
+ * The `0x0000aa36a723…` prefix is not noise — it is the handle header, and it is
+ * how you tell a real one apart at a glance: byte [0] is the version, [1‑4] carry
+ * the chain id (0xaa36a7 = Sepolia), [5] the TEE type, [6] the attribute bits,
+ * and only [7‑31] are the digest. Any "handle" whose first bytes look random is
+ * invented.
+ */
+const HERO_HANDLE = "0x0000aa36a72301f61db81e3459bce3b43b31cac7a6983c864b9cd4a94dcb2b30";
 
 export default function LandingPage() {
   const [enhanced, setEnhanced] = useState(false);
