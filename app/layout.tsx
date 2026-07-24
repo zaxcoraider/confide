@@ -31,7 +31,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Confide — private payroll for public treasuries",
+  title: "Confide",
   description:
     "A Safe module that pays contributors confidential amounts. The treasury total stays publicly auditable; individual payouts do not.",
 };
