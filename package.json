@@ -9,8 +9,6 @@
     "build": "next build",
     "start": "next start",
     "compile": "hardhat compile",
-    "phase0": "tsx scripts/phase0.ts",
-    "phase05": "tsx scripts/phase05.ts",
     "phase1": "tsx scripts/phase1.ts",
     "phase2": "tsx scripts/phase2.ts",
     "phase3": "tsx scripts/phase3.ts"
